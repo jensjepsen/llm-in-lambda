@@ -2,3 +2,7 @@
 **/.models/
 **/.cache
 **/.pytest_cache
+<<<<<<< HEAD
+=======
+**/__pycache__
+>>>>>>> 6d0e0c1 (feat: llama in lambda)

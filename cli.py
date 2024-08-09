@@ -1,33 +1,44 @@
-import typer
-from llama_cpp import Llama
+import typer, json
+
+import requests
+
+import botocore.session
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
 
 app = typer.Typer()
 
-PROMPT = """<|system|>
-You're a nice chatbot
-<|end|>
-<|user|>
-{msg}
-<|end|>
-<|assistant|>
-"""
-
-stop = ["<|system|>", "<|user|>", "<|assistant|>", "<|end|>"]
+session = botocore.session.Session()
 
 @app.command()
-def main(model_path: str, msg: str = "Write a poem"):
-    llama = Llama(model_path=model_path, n_threads=8, use_mlock=True, n_gpu_layers=0)
-    print("Model loaded")
-    print("Reponse:")
-    print("--------")
-    prompt = llama.tokenize(PROMPT.format(msg=msg).encode())
-    for tok in llama.generate(prompt):
-        print(llama.detokenize([tok]).decode(), sep="", end="", flush=True)
+def invoke_lambda(function_url: str):
+    sigv4 = SigV4Auth(session.get_credentials(),
+                  service_name="lambda",
+                  region_name="eu-central-1")
 
-
+    data = json.dumps([
+            {
+                "content": "You're a really nice assistant.",
+                "role": "system"
+            },
+            {
+                "content": "Write some cool python code",
+                "role": "user"
+            }
+        ])
+    
+    request = AWSRequest(method="POST", url=function_url + "chat", data=data)
+    
+    sigv4.add_auth(request)
+    signed = request.prepare()
+    response = requests.post(signed.url, headers=signed.headers, data=signed.body, stream=True)
+    print(response.status_code)
+    for line in response.iter_lines():
+        line = line.decode("utf-8")
+        if line.startswith("data: "):
+            print(json.loads(line[6:])['choices'][0]['text'], end="", flush=True)
 
 if __name__ == "__main__":
     app()
-
 
 
